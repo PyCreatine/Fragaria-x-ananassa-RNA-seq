@@ -1,0 +1,300 @@
+---
+title: "rna seq"
+author: "Antonio Gálvez Muñoz"
+date: "8/11/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Loading libraries
+
+```{r}
+library(data.table)
+library(tximport)
+library(DESeq2)
+library(apeglm)
+library(ggplot2)
+library(ggrepel)
+library(EnhancedVolcano)
+library(GenomicFeatures)
+library(pheatmap)
+library(RColorBrewer)
+library(tidyverse)
+library(ashr)
+```
+
+# Creating TxDb object
+
+```{r}
+gff3 = "Fragaria_ananassa_v1.0.a2.genes.gff3"
+txdb.filename = "annotation.sqlite"
+
+txdb = makeTxDbFromGFF(gff3)
+
+#Save database
+saveDb(txdb, txdb.filename)
+```
+
+```{r}
+#Creating tx2 object
+k = keys(txdb, keytype = "TXNAME")
+tx2gene = select(txdb, k, "GENEID", "TXNAME")
+```
+#Loading the data
+
+```{r}
+#Loading plant data
+sampleData=fread("coldata.txt")
+sampleData=as.data.frame(sampleData)
+rownames(sampleData) = sampleData$run_accession
+sampleData=sampleData[,-c(4,5)]
+sampleData$sample_alias = as.factor(sampleData$sample_alias)
+```
+
+
+```{r}
+#Loading abundance files
+dir="./"
+files = file.path(paste0(dir, "kallisto"), list.files(paste0(dir, "kallisto")), "abundance.h5")
+names(files) = list.files(paste0(dir, "kallisto"))
+```
+
+```{r}
+#Import files with txi
+txi = tximport(files, type = "kallisto", tx2gene = tx2gene, 
+txIn = TRUE, txOut = FALSE, countsFromAbundance = "no")
+```
+# Differential gene expression analysis
+
+```{r}
+#Create DESeq object
+ddsMat= DESeqDataSetFromTximport(txi, colData = sampleData, ~ sample_alias)
+```
+
+```{r}
+#Filtrado minimo
+ddsMat=ddsMat[ rowSums(counts(dds)) > 1, ]
+```
+
+```{r}
+#data trnasformation
+vsd = vst(ddsMat)
+```
+
+```{r}
+#PCA vst
+pcaData = plotPCA(vsd, intgroup=c("sample_alias"), 
+returnData=TRUE)
+percentVar = round(100 * attr(pcaData, "percentVar"))
+```
+
+```{r}
+#PCA plot
+ggplot(pcaData, aes(PC1, PC2, colour = sample_alias)) + 
+geom_point(size = 2) + theme_bw() +
+geom_text_repel(aes(label = sample_alias), nudge_x = -1, nudge_y = 0.2, size = 3) +
+ggtitle("Principal Component Analysis (PCA)", subtitle = "vst transformation") +
+xlab(paste0("PC1: ",percentVar[1],"% variance")) +
+ylab(paste0("PC2: ",percentVar[2],"% variance"))
+```
+
+```{r}
+#Matriz de distancias y heatmap
+sampleDists = dist(t(assay(vsd)))
+
+sampleDistMatrix = as.matrix( sampleDists )
+rownames(sampleDistMatrix) <- paste(vsd$sample_alias)
+colnames(sampleDistMatrix) <- paste(vsd$sample_alias)
+colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+pheatmap(sampleDistMatrix,
+         clustering_distance_rows = sampleDists,
+         clustering_distance_cols = sampleDists,
+         col = colors)
+```
+
+```{r}
+#Genes diferencialmente expresados
+dds=DESeq(ddsMat)
+```
+
+```{r}
+#Shrinkage for MA plot
+WGA_ash=lfcShrink(dds, contrast = c("sample_alias","White_A","Green_A"), type = "ashr")
+TWA_ash=lfcShrink(dds, contrast = c("sample_alias","Turning _A","White_A"), type = "ashr")
+RTA_ash=lfcShrink(dds, contrast = c("sample_alias","Red_A","Turning _A"), type = "ashr")
+
+WGR_ash=lfcShrink(dds, contrast = c("sample_alias","White_R","Green_R"), type = "ashr")
+TWR_ash=lfcShrink(dds, contrast = c("sample_alias","Turning_R","White_R"), type = "ashr")
+RTR_ash=lfcShrink(dds, contrast = c("sample_alias","Red_R","Turning_R"), type = "ashr")
+```
+
+```{r}
+#MA plots
+plotMA(WGA_ash,ylim=c(-10,10), main="White_A_vs_Green_A")
+plotMA(TWA_ash,ylim=c(-6,6), main="Turning_A_vs_White_A")
+plotMA(RTA_ash,ylim=c(-5,5), main="Red_A_vs_Turning_A")
+
+plotMA(WGR_ash,ylim=c(-10,10), main="White_R_vs_Green_R")
+plotMA(TWR_ash,ylim=c(-6,6), main="Turning_R_vs_White_R")
+plotMA(RTR_ash,ylim=c(-6,6), main="Red_R_vs_Turning_R")
+```
+
+```{r}
+#Results
+WG_A=results(dds, contrast = c("sample_alias","White_A","Green_A"),alpha = 0.01,lfcThreshold=1)
+TW_A=results(dds, contrast = c("sample_alias","Turning _A","White_A"),alpha = 0.01,lfcThreshold=1)
+RT_A=results(dds, contrast = c("sample_alias","Red_A","Turning _A"),alpha = 0.01,lfcThreshold=1)
+
+WG_R=results(dds, contrast = c("sample_alias","White_R","Green_R"),alpha = 0.01,lfcThreshold=1)
+TW_R=results(dds, contrast = c("sample_alias","Turning_R","White_R"),alpha = 0.01,lfcThreshold=1)
+RT_R=results(dds, contrast = c("sample_alias","Red_R","Turning_R"),alpha = 0.01,lfcThreshold=1)
+
+#Subsetting significantly different genes
+WGA_sig = subset(WG_A, padj < 0.01)
+TWA_sig = subset(TW_A, padj < 0.01)
+RTA_sig = subset(RT_A, padj < 0.01)
+
+WGR_sig = subset(WG_R, padj < 0.01)
+TWR_sig = subset(TW_R, padj < 0.01)
+RTR_sig = subset(RT_R, padj < 0.01)
+
+#Upregulated: WGA_sig[which(WGA_sig$log2FoldChange>1),]
+#Downregulated: WGA_sig[which(WGA_sig$log2FoldChange<1),]
+```
+
+#Homeologs analysis
+
+```{r}
+#Homeologs reading
+homeologs=fread("homeolog_clean.ABCD.list",header = FALSE)
+homeologs=as.data.frame(homeologs)
+
+#Remove duplicate rows
+homeologs=homeologs[!duplicated(homeologs),]
+
+#Naming each subgenome
+colnames(homeologs)=c("Vesca","Iinumae","Nipponica","Viridis")
+
+#Genome dictionary
+subgenomes=data.frame(subgenome=rep(c("Vesca","Iinumae","Nipponica","Viridis"),times=7))
+
+#Qualitative assessment of subgenome bias within DEG
+frec_absoluta=c(0,0,0,0)
+position=c("Vesca","Iinumae","Nipponica","Viridis")
+#selection=subset(RTR_sig, log2FoldChange>1)
+selection=subset(RTR_sig, log2FoldChange<1)
+genomeid=numeric()
+
+for (i in 1:nrow(selection)) 
+{
+  genomeid=strsplit(row.names(selection[i,]),"[_*g]")[[1]][2]
+  frec_absoluta[which(position==subgenomes[genomeid,])]=frec_absoluta[which(position==subgenomes[genomeid,])]+1
+}
+```
+
+```{r}
+#DEG vs homeolog tetrads
+#Reuse this code changing which set of genes you wanna compare
+#Change value of log2FoldChange to either use this for up regulated (>1) or down regulated (<1)
+frec_absoluta=c()
+selection=subset(RTR_sig, log2FoldChange<1)
+geneid=character(); genomeid=0
+
+
+for (i in 1:nrow(selection)) 
+{
+  geneid=row.names(selection[i,])
+  genomeid=as.numeric(which(geneid==homeologs, arr.ind = TRUE)[2])
+  if(is.na(genomeid)) {next}
+  if(genomeid>4) {genomeid=which(geneid==homeologs[genomeid,])}
+  frec_absoluta=c(frec_absoluta,genomeid)
+}
+
+table(frec_absoluta)
+```
+
+#DEG anotation for gene set enrichment
+
+```{r}
+#Read GO accesions
+GO_dict=fread("GOfragaria.txt",header = FALSE)
+GO_dict=as.data.frame(GO_dict)
+colnames(GO_dict)=c("ID","GO_ID")
+
+#Remove duplicate rows
+GO_dict=GO_dict[!duplicated(GO_dict),]
+
+#Save DEG on a dataframe with their GO annotation
+DEG_GO=function(data,dict,regulated=1)
+{
+  #Select upregulated(regulated=1) or downregulated(regulated!=1) genes in data
+  if(regulated==1) {
+    data_used=data[which(data$log2FoldChange>1),]
+  }
+  else {
+    data_used=data[which(data$log2FoldChange<1),]
+  }
+  #Create empty dataframe to save GO ID of genes
+  deg_frame=data.frame(ID=character(),GO_ID=character())
+  #Iterate over every diferentially expresed gene in data and save 
+  genes=nrow(data_used)
+  for (i in 1:genes) 
+  {
+    deg_frame=rbind(deg_frame,dict[which(dict==row.names(data_used[i,])),])
+  }
+  return(deg_frame)
+}
+
+#Create dataframe for each test
+up_WGA=DEG_GO(WGA_sig,GO_dict)
+down_WGA=DEG_GO(WGA_sig,GO_dict,regulated = 0)
+
+up_TWA=DEG_GO(TWA_sig,GO_dict)
+down_TWA=DEG_GO(TWA_sig,GO_dict,regulated = 0)
+
+up_RTA=DEG_GO(RTA_sig,GO_dict)
+down_RTA=DEG_GO(RTA_sig,GO_dict,regulated = 0)
+
+up_WGR=DEG_GO(WGR_sig,GO_dict)
+down_WGR=DEG_GO(WGR_sig,GO_dict,regulated = 0)
+
+up_TWR=DEG_GO(TWR_sig,GO_dict)
+down_TWR=DEG_GO(TWR_sig,GO_dict,regulated = 0)
+
+up_RTR=DEG_GO(RTR_sig,GO_dict)
+down_RTR=DEG_GO(RTR_sig,GO_dict,regulated = 0)
+
+#Write files from the dataframes
+fwrite(up_WGA,file = "up_WGA_GO.txt",sep = "\t")
+fwrite(down_WGA,file = "down_WGA_GO.txt",sep = "\t")
+
+fwrite(up_TWA,file = "up_TWA_GO.txt",sep = "\t")
+fwrite(down_TWA,file = "down_TWA_GO.txt",sep = "\t")
+
+fwrite(up_RTA,file = "up_RTA_GO.txt",sep = "\t")
+fwrite(down_RTA,file = "down_RTA_GO.txt",sep = "\t")
+
+fwrite(up_WGR,file = "up_WGR_GO.txt",sep = "\t")
+fwrite(down_WGR,file = "down_WGR_GO.txt",sep = "\t")
+
+fwrite(up_TWR,file = "up_TWR_GO.txt",sep = "\t")
+fwrite(down_TWR,file = "down_TWR_GO.txt",sep = "\t")
+
+fwrite(up_RTR,file = "up_RTR_GO.txt",sep = "\t")
+fwrite(down_RTR,file = "down_RTR_GO.txt",sep = "\t")
+```
+
+
+
+
+
+
+
+
+
+
+
+
