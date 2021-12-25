@@ -4,9 +4,7 @@
 
 High resolution images obtained from AgriGO for gene set enrichment of differentially expresed genes. Genes from each set with their GO ID can be obtained from the `DEG annotated` folder
 
-Image name codes follow the pattern
-
-`Condition1Condition2 + tissue + geneset`
+Image name codes follow the pattern: `Condition1Condition2 + tissue + geneset`
 
 `Condition1Condition2` refers to which 2 conditions where being contrasted while doing the differential expression analysis (ie: WG means the stages that were being compared were White vs Green)
 
