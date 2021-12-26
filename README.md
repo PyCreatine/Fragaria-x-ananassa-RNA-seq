@@ -1,6 +1,6 @@
 # Fragaria-x-ananassa-RNA-seq
 
-File and code repository for the analysis of RNA-seq data of _Fragaria x ananassa_ using Kallisto \[1] and the new reference genome v1.0.a2 [2]
+File and code repository for the analysis of RNA-seq data of _Fragaria x ananassa_ using Kallisto [1] and the new reference genome v1.0.a2 [2]
 
 ## Scripts
 
@@ -10,7 +10,11 @@ All the files containing the code used to carry on the analysis. Both `.ipynb` n
 
 `LAST_homeolog.ipynb` was used to determine the posible list of homeolog tetrads between all the subgenomes of _Fragaria x ananassa_. It uses LAST [4] and other scripts [5]
 
-`DEG_homeolog_analysis.Rmd` is an Rmarkdown script with all the code used to do the differential expression analysis, as well as some file processing for the Gene set enrichment analysis and the analysis of homeolog bias which can be found in the homeolog sheet in `Comparisons.xlsx`
+`DEG_homeolog_analysis.Rmd` is an Rmarkdown script with all the code used to do the differential expression analysis, as well as some file processing for the Gene set enrichment analysis and the analysis of homeolog bias which can be found in the homeolog sheet in `Comparisons.xlsx`. This script uses both files `coldata.txt` and `GOfragaria.txt` to carry on some of these functions.
+
+## DEG annotated
+
+Lists of the diferentially expressed genes in each condition with their respectives GO identitificators. These lists were made using some of the code in `DEG_homeolog_analysis.Rmd` and the `GOfragaria.txt` file
 
 ## Homeologs
 
