@@ -12,6 +12,8 @@ All the files containing the code used to carry on the analysis. Both `.ipynb` n
 
 `DEG_homeolog_analysis.Rmd` is an Rmarkdown script with all the code used to do the differential expression analysis, as well as some file processing for the Gene set enrichment analysis and the analysis of homeolog bias which can be found in the homeolog sheet in `Comparisons.xlsx`. This script uses both files `coldata.txt` and `GOfragaria.txt` to carry on some of these functions.
 
+`Comparisons.xlsx` contains the aggregated data on some of the main comparisons carried out. Mainly, comparing the results of number of differentially expressed genes between the analysis carried out with kallisto, and the one carried out with featureCounts [2]. There is also data on the homeolog bias selection between conditions using statistical tests to determine wether there is differences.
+
 ## DEG annotated
 
 Lists of the diferentially expressed genes in each condition with their respectives GO identitificators. These lists were made using some of the code in `DEG_homeolog_analysis.Rmd` and the `GOfragaria.txt` file
